@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Titanic EDA — Power BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy: #1E3A8A;
+    --blue: #1D4ED8;
+    --lblue: #3B82F6;
+    --cyan: #06B6D4;
+    --green: #16A34A;
+    --red: #DC2626;
+    --gold: #F59E0B;
+    --purple: #7C3AED;
+    --gray: #F1F5F9;
+    --dgray: #374151;
+    --white: #FFFFFF;
+    --sidebar: #0F1F4A;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI', 'Calibri', sans-serif; background:#E8EDF5; display:flex; height:100vh; overflow:hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    min-width:220px;
+    background: var(--sidebar);
+    display:flex;
+    flex-direction:column;
+    padding: 0;
+    z-index:10;
+  }
+  .sidebar-logo {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-logo .ship { font-size:28px; }
+  .sidebar-logo h2 { color:var(--white); font-size:13px; font-weight:700; margin-top:4px; letter-spacing:0.5px; }
+  .sidebar-logo p { color:#94A3B8; font-size:10px; margin-top:2px; }
+  .sidebar-nav { padding:12px 0; flex:1; overflow-y:auto; }
+  .nav-section { padding:8px 16px 4px; font-size:9px; color:#64748B; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding:9px 16px; cursor:pointer; color:#CBD5E1;
+    font-size:12.5px; border-left:3px solid transparent; transition:all 0.15s;
+  }
+  .nav-item:hover { background:rgba(255,255,255,0.06); color:var(--white); }
+  .nav-item.active { background:rgba(29,78,216,0.3); color:var(--white); border-left:3px solid var(--cyan); }
+  .nav-item .icon { font-size:16px; width:20px; text-align:center; }
+  .sidebar-footer { padding:12px 16px; border-top:1px solid rgba(255,255,255,0.1); }
+  .sidebar-footer p { color:#64748B; font-size:10px; }
+  .sidebar-footer strong { color:#94A3B8; }
+
+  /* Main content */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* Top bar */
+  .topbar {
+    background:var(--white);
+    border-bottom:1px solid #E2E8F0;
+    padding:0 20px;
+    height:52px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  }
+  .topbar-left { display:flex; align-items:center; gap:12px; }
+  .page-title { font-size:15px; font-weight:700; color:var(--navy); }
+  .page-sub { font-size:11px; color:#94A3B8; }
+  .topbar-right { display:flex; align-items:center; gap:10px; }
+  .filter-btn {
+    padding:5px 12px; border:1px solid #E2E8F0; border-radius:6px;
+    font-size:11px; color:var(--dgray); background:var(--gray); cursor:pointer;
+    display:flex; align-items:center; gap:5px;
+  }
+  .filter-btn:hover { background:#E2E8F0; }
+  .refresh-btn {
+    padding:5px 12px; border:none; border-radius:6px;
+    font-size:11px; color:var(--white); background:var(--blue); cursor:pointer;
+  }
+  .date-chip { font-size:11px; color:#64748B; background:var(--gray); padding:4px 10px; border-radius:20px; }
+
+  /* Dashboard canvas */
+  .canvas {
+    flex:1; overflow-y:auto; padding:16px 20px;
+    display:grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: auto;
+    gap:12px;
+    align-content:start;
+  }
+
+  /* KPI Cards */
+  .kpi-card {
+    background:var(--white);
+    border-radius:10px;
+    padding:14px 16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    border-left:4px solid var(--blue);
+    position:relative;
+    overflow:hidden;
+    grid-column: span 3;
+  }
+  .kpi-card::after {
+    content:''; position:absolute; right:-15px; top:-15px;
+    width:60px; height:60px; border-radius:50%;
+    background:var(--accent, #1D4ED8);
+    opacity:0.08;
+  }
+  .kpi-label { font-size:10px; color:#94A3B8; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+  .kpi-value { font-size:28px; font-weight:800; color:var(--navy); line-height:1; }
+  .kpi-sub { font-size:10px; color:#64748B; }
+  .kpi-badge {
+    display:inline-flex; align-items:center; gap:3px;
+    font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px;
+    width:fit-content;
+  }
+  .badge-green { background:#D1FAE5; color:var(--green); }
+  .badge-red { background:#FEE2E2; color:var(--red); }
+  .badge-blue { background:#DBEAFE; color:var(--blue); }
+  .badge-gold { background:#FEF3C7; color:#92400E; }
+
+  /* Chart panels */
+  .chart-panel {
+    background:var(--white);
+    border-radius:10px;
+    padding:14px 16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
+    display:flex;
+    flex-direction:column;
+  }
+  .panel-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .panel-title { font-size:12.5px; font-weight:700; color:var(--navy); }
+  .panel-sub { font-size:10px; color:#94A3B8; margin-top:2px; }
+  .panel-tag {
+    font-size:9px; font-weight:700; color:var(--blue);
+    background:#DBEAFE; padding:2px 8px; border-radius:20px;
+  }
+  .chart-container { flex:1; min-height:0; position:relative; }
+
+  /* Heatmap table */
+  .heatmap-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .heatmap-table th { background:var(--navy); color:var(--white); padding:7px 10px; text-align:center; font-weight:600; font-size:11px; }
+  .heatmap-table td { text-align:center; padding:10px; font-weight:700; font-size:15px; border:1px solid #E2E8F0; }
+  .hm-excellent { background:#16A34A; color:#fff; }
+  .hm-good { background:#22C55E; color:#fff; }
+  .hm-moderate { background:#86EFAC; color:#14532D; }
+  .hm-poor { background:#FECACA; color:#991B1B; }
+  .hm-bad { background:#DC2626; color:#fff; }
+
+  /* Insight cards */
+  .insight-list { display:flex; flex-direction:column; gap:8px; }
+  .insight-item {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:10px; border-radius:8px; background:var(--gray);
+    border-left:3px solid var(--blue);
+  }
+  .insight-icon { font-size:18px; flex-shrink:0; }
+  .insight-text strong { font-size:11.5px; color:var(--navy); display:block; margin-bottom:2px; }
+  .insight-text span { font-size:10.5px; color:var(--dgray); line-height:1.4; }
+
+  /* Slicer panel */
+  .slicer-panel {
+    background:var(--white); border-radius:10px; padding:14px 16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
+    grid-column: span 3;
+  }
+  .slicer-title { font-size:11px; font-weight:700; color:var(--navy); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+  .slicer-pills { display:flex; flex-wrap:wrap; gap:6px; }
+  .pill {
+    padding:4px 10px; border-radius:20px; font-size:10.5px; font-weight:600;
+    border:1.5px solid #E2E8F0; cursor:pointer; transition:all 0.15s; color:var(--dgray); background:var(--gray);
+  }
+  .pill.active, .pill:hover { background:var(--navy); color:var(--white); border-color:var(--navy); }
+  .pill.active-green { background:var(--green); color:var(--white); border-color:var(--green); }
+  .pill.active-red { background:var(--red); color:var(--white); border-color:var(--red); }
+
+  /* Progress bars for class comparison */
+  .progress-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .progress-label { font-size:11px; font-weight:600; color:var(--dgray); width:70px; flex-shrink:0; }
+  .progress-bar-wrap { flex:1; height:22px; background:#E2E8F0; border-radius:4px; overflow:hidden; position:relative; }
+  .progress-bar { height:100%; border-radius:4px; display:flex; align-items:center; justify-content:flex-end; padding-right:6px; }
+  .progress-val { font-size:11px; font-weight:700; color:var(--white); }
+  .progress-count { font-size:10px; color:#94A3B8; width:60px; text-align:right; flex-shrink:0; }
+
+  /* Data table */
+  .data-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .data-table thead tr { background:var(--navy); }
+  .data-table thead th { color:var(--white); padding:8px 10px; text-align:left; font-weight:600; font-size:10.5px; }
+  .data-table tbody tr { border-bottom:1px solid #F1F5F9; }
+  .data-table tbody tr:hover { background:#F8FAFF; }
+  .data-table tbody td { padding:7px 10px; color:var(--dgray); }
+  .rate-pill { padding:2px 8px; border-radius:20px; font-weight:700; font-size:10px; }
+
+  /* Grid helpers */
+  .span-12 { grid-column: span 12; }
+  .span-8 { grid-column: span 8; }
+  .span-7 { grid-column: span 7; }
+  .span-6 { grid-column: span 6; }
+  .span-5 { grid-column: span 5; }
+  .span-4 { grid-column: span 4; }
+  .span-3 { grid-column: span 3; }
+  .span-9 { grid-column: span 9; }
+
+  .scrollable { overflow-y:auto; max-height:260px; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="ship">🚢</div>
+    <h2>TITANIC EDA</h2>
+    <p>Power BI Dashboard · Project 1</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Dashboard</div>
+    <div class="nav-item active"><span class="icon">📊</span> Overview</div>
+    <div class="nav-item"><span class="icon">👥</span> Demographics</div>
+    <div class="nav-item"><span class="icon">🎫</span> Class Analysis</div>
+    <div class="nav-item"><span class="icon">🎂</span> Age Analysis</div>
+    <div class="nav-section">Reports</div>
+    <div class="nav-item"><span class="icon">📋</span> Summary Report</div>
+    <div class="nav-item"><span class="icon">🔬</span> Feature Insights</div>
+    <div class="nav-section">Data</div>
+    <div class="nav-item"><span class="icon">🗄</span> Raw Dataset</div>
+    <div class="nav-item"><span class="icon">⚙</span> Settings</div>
+  </nav>
+  <div class="sidebar-footer">
+    <p>Dataset: <strong>Kaggle Titanic</strong></p>
+    <p>Records: <strong>891 rows</strong></p>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="page-title">🚢 Titanic — Survival Analysis Dashboard</div>
+        <div class="page-sub">EDA Project 1 · SyntecxHub Data Science Series</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="date-chip">📅 Dataset: 1912 · Training Split</div>
+      <button class="filter-btn">⚙ Filters</button>
+      <button class="refresh-btn">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD CANVAS -->
+  <div class="canvas">
+
+    <!-- KPI CARDS -->
+    <div class="kpi-card" style="border-color:#1E3A8A; --accent:#1E3A8A;">
+      <div class="kpi-label">Total Passengers</div>
+      <div class="kpi-value">891</div>
+      <div class="kpi-sub">Training dataset (Kaggle)</div>
+      <div class="kpi-badge badge-blue">📊 12 features</div>
+    </div>
+    <div class="kpi-card" style="border-color:#16A34A; --accent:#16A34A;">
+      <div class="kpi-label">Survived</div>
+      <div class="kpi-value" style="color:#16A34A;">342</div>
+      <div class="kpi-sub">38.4% overall survival rate</div>
+      <div class="kpi-badge badge-green">↑ 38.4% rate</div>
+    </div>
+    <div class="kpi-card" style="border-color:#DC2626; --accent:#DC2626;">
+      <div class="kpi-label">Perished</div>
+      <div class="kpi-value" style="color:#DC2626;">549</div>
+      <div class="kpi-sub">61.6% fatality rate</div>
+      <div class="kpi-badge badge-red">↓ 61.6% rate</div>
+    </div>
+    <div class="kpi-card" style="border-color:#F59E0B; --accent:#F59E0B;">
+      <div class="kpi-label">Avg Fare Paid</div>
+      <div class="kpi-value" style="color:#92400E;">£32.2</div>
+      <div class="kpi-sub">Std dev: £49.7 · Max: £512</div>
+      <div class="kpi-badge badge-gold">Corr +0.26</div>
+    </div>
+
+    <!-- GENDER CHART -->
+    <div class="chart-panel span-4" style="min-height:260px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">👥 Survival by Gender</div>
+          <div class="panel-sub">Strongest predictor (r = 0.54)</div>
+        </div>
+        <span class="panel-tag">KEY DRIVER</span>
+      </div>
+      <div class="chart-container" style="height:200px;">
+        <canvas id="genderChart"></canvas>
+      </div>
+    </div>
+
+    <!-- CLASS CHART -->
+    <div class="chart-panel span-4" style="min-height:260px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">🎫 Survival by Passenger Class</div>
+          <div class="panel-sub">Class 1–3 breakdown with gender split</div>
+        </div>
+        <span class="panel-tag">SOCIAL FACTOR</span>
+      </div>
+      <div class="chart-container" style="height:200px;">
+        <canvas id="classChart"></canvas>
+      </div>
+    </div>
+
+    <!-- AGE CHART -->
+    <div class="chart-panel span-4" style="min-height:260px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">🎂 Survival by Age Group</div>
+          <div class="panel-sub">Children had the highest priority</div>
+        </div>
+        <span class="panel-tag">AGE BUCKETS</span>
+      </div>
+      <div class="chart-container" style="height:200px;">
+        <canvas id="ageChart"></canvas>
+      </div>
+    </div>
+
+    <!-- HEATMAP: CLASS × SEX -->
+    <div class="chart-panel span-5" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">🔥 Survival Heatmap — Class × Sex</div>
+          <div class="panel-sub">Survival rate (%) per segment</div>
+        </div>
+        <span class="panel-tag">CROSS-TAB</span>
+      </div>
+      <div style="margin-top:8px; overflow:auto;">
+        <table class="heatmap-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>👩 Female</th>
+              <th>👨 Male</th>
+              <th>Overall</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:700; background:#EFF6FF; color:#1E3A8A; text-align:left; padding-left:12px;">1st Class</td>
+              <td class="hm-excellent">96.8%</td>
+              <td class="hm-moderate">36.9%</td>
+              <td class="hm-good">63.0%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700; background:#EFF6FF; color:#1E3A8A; text-align:left; padding-left:12px;">2nd Class</td>
+              <td class="hm-excellent">92.1%</td>
+              <td class="hm-poor">15.7%</td>
+              <td class="hm-moderate">47.3%</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700; background:#EFF6FF; color:#1E3A8A; text-align:left; padding-left:12px;">3rd Class</td>
+              <td class="hm-moderate">50.0%</td>
+              <td class="hm-bad">13.5%</td>
+              <td class="hm-poor">24.2%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+          <span style="font-size:9px; color:#64748B; display:flex; align-items:center; gap:3px;"><span style="width:10px;height:10px;background:#16A34A;border-radius:2px;display:inline-block;"></span> Excellent (≥80%)</span>
+          <span style="font-size:9px; color:#64748B; display:flex; align-items:center; gap:3px;"><span style="width:10px;height:10px;background:#22C55E;border-radius:2px;display:inline-block;"></span> Good (60-79%)</span>
+          <span style="font-size:9px; color:#64748B; display:flex; align-items:center; gap:3px;"><span style="width:10px;height:10px;background:#86EFAC;border-radius:2px;display:inline-block;"></span> Moderate (40-59%)</span>
+          <span style="font-size:9px; color:#64748B; display:flex; align-items:center; gap:3px;"><span style="width:10px;height:10px;background:#FECACA;border-radius:2px;display:inline-block;"></span> Poor (20-39%)</span>
+          <span style="font-size:9px; color:#64748B; display:flex; align-items:center; gap:3px;"><span style="width:10px;height:10px;background:#DC2626;border-radius:2px;display:inline-block;"></span> Critical (&lt;20%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLASS PROGRESS BARS -->
+    <div class="chart-panel span-4" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">📊 Class Survival Rate (Visual)</div>
+          <div class="panel-sub">Comparative survivor bars</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="progress-row">
+          <div class="progress-label">1st Class</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" style="width:63%; background:linear-gradient(90deg,#16A34A,#22C55E);">
+              <span class="progress-val">63%</span>
+            </div>
+          </div>
+          <div class="progress-count">216 pass.</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label">2nd Class</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" style="width:47.3%; background:linear-gradient(90deg,#1D4ED8,#3B82F6);">
+              <span class="progress-val">47%</span>
+            </div>
+          </div>
+          <div class="progress-count">184 pass.</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label">3rd Class</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" style="width:24.2%; background:linear-gradient(90deg,#DC2626,#EF4444);">
+              <span class="progress-val">24%</span>
+            </div>
+          </div>
+          <div class="progress-count">491 pass.</div>
+        </div>
+        <div style="height:1px; background:#E2E8F0; margin:14px 0;"></div>
+        <div class="progress-row">
+          <div class="progress-label">Female</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" style="width:74.2%; background:linear-gradient(90deg,#7C3AED,#A78BFA);">
+              <span class="progress-val">74.2%</span>
+            </div>
+          </div>
+          <div class="progress-count">314 pass.</div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-label">Male</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" style="width:18.9%; background:linear-gradient(90deg,#F59E0B,#FCD34D);">
+              <span class="progress-val">18.9%</span>
+            </div>
+          </div>
+          <div class="progress-count">577 pass.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEY INSIGHTS PANEL -->
+    <div class="chart-panel span-3" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">💡 Key Insights</div>
+          <div class="panel-sub">Top EDA findings</div>
+        </div>
+      </div>
+      <div class="insight-list" style="margin-top:6px;">
+        <div class="insight-item" style="border-color:#1D4ED8;">
+          <div class="insight-icon">♀</div>
+          <div class="insight-text">
+            <strong>Gender #1 Predictor</strong>
+            <span>Females 4× more likely to survive than males</span>
+          </div>
+        </div>
+        <div class="insight-item" style="border-color:#16A34A;">
+          <div class="insight-icon">🎫</div>
+          <div class="insight-text">
+            <strong>Class = Deck Position</strong>
+            <span>1st class had better lifeboat access</span>
+          </div>
+        </div>
+        <div class="insight-item" style="border-color:#F59E0B;">
+          <div class="insight-icon">👶</div>
+          <div class="insight-text">
+            <strong>Children Prioritized</strong>
+            <span>Under-12 had 58% survival rate</span>
+          </div>
+        </div>
+        <div class="insight-item" style="border-color:#7C3AED;">
+          <div class="insight-icon">👨‍👩‍👧</div>
+          <div class="insight-text">
+            <strong>Family Sweet Spot</strong>
+            <span>Size 2-4 achieved ~57% survival</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAMILY SIZE CHART -->
+    <div class="chart-panel span-6" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">👨‍👩‍👧 Family Size vs Survival Rate</div>
+          <div class="panel-sub">Sweet spot at size 2–4 | Solo travelers disadvantaged</div>
+        </div>
+        <span class="panel-tag">LINE TREND</span>
+      </div>
+      <div class="chart-container" style="height:185px;">
+        <canvas id="familyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- EMBARKATION CHART -->
+    <div class="chart-panel span-3" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">🚢 Embarkation Port</div>
+          <div class="panel-sub">Survival by port of origin</div>
+        </div>
+      </div>
+      <div class="chart-container" style="height:185px;">
+        <canvas id="portChart"></canvas>
+      </div>
+    </div>
+
+    <!-- PASSENGER TABLE -->
+    <div class="chart-panel span-3" style="min-height:240px;">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">📋 Segment Summary</div>
+          <div class="panel-sub">Survival by key segments</div>
+        </div>
+      </div>
+      <div class="scrollable">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Segment</th>
+              <th>Survived</th>
+              <th>Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1st Female</td><td>91</td><td><span class="rate-pill" style="background:#D1FAE5;color:#16A34A;">96.8%</span></td></tr>
+            <tr><td>2nd Female</td><td>70</td><td><span class="rate-pill" style="background:#D1FAE5;color:#16A34A;">92.1%</span></td></tr>
+            <tr><td>3rd Female</td><td>72</td><td><span class="rate-pill" style="background:#FEF3C7;color:#92400E;">50.0%</span></td></tr>
+            <tr><td>1st Male</td><td>45</td><td><span class="rate-pill" style="background:#DBEAFE;color:#1D4ED8;">36.9%</span></td></tr>
+            <tr><td>Child (0-12)</td><td>~38</td><td><span class="rate-pill" style="background:#FEF3C7;color:#92400E;">58.0%</span></td></tr>
+            <tr><td>2nd Male</td><td>17</td><td><span class="rate-pill" style="background:#FEE2E2;color:#DC2626;">15.7%</span></td></tr>
+            <tr><td>3rd Male</td><td>47</td><td><span class="rate-pill" style="background:#FEE2E2;color:#DC2626;">13.5%</span></td></tr>
+            <tr><td>Senior (60+)</td><td>~20</td><td><span class="rate-pill" style="background:#FEE2E2;color:#DC2626;">22.7%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const chartDefaults = {
+  plugins: { legend: { display: false } },
+  responsive: true, maintainAspectRatio: false
+};
+
+// Gender Chart (Doughnut)
+new Chart(document.getElementById('genderChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Female', 'Male'],
+    datasets: [{
+      label: 'Survived %',
+      data: [74.2, 18.9],
+      backgroundColor: ['rgba(29,78,216,0.85)', 'rgba(220,38,38,0.85)'],
+      borderRadius: 6,
+      borderWidth: 0
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      y: { max: 100, grid: { color: '#F1F5F9' }, ticks: { callback: v => v+'%', font:{size:10} } },
+      x: { grid: { display: false }, ticks: { font:{size:11,weight:'bold'} } }
+    },
+    plugins: { legend:{display:false}, tooltip: { callbacks: { label: ctx => ctx.parsed.y + '% survival rate' } } }
+  }
+});
+
+// Class Chart (grouped bar)
+new Chart(document.getElementById('classChart'), {
+  type: 'bar',
+  data: {
+    labels: ['1st Class', '2nd Class', '3rd Class'],
+    datasets: [
+      { label: 'Female', data: [96.8, 92.1, 50.0], backgroundColor: 'rgba(29,78,216,0.85)', borderRadius: 4 },
+      { label: 'Male', data: [36.9, 15.7, 13.5], backgroundColor: 'rgba(220,38,38,0.75)', borderRadius: 4 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      y: { max: 100, grid: { color: '#F1F5F9' }, ticks: { callback: v => v+'%', font:{size:10} } },
+      x: { grid: { display: false }, ticks: { font:{size:10} } }
+    },
+    plugins: { legend:{ display:true, position:'bottom', labels:{font:{size:10}, boxWidth:12} } }
+  }
+});
+
+// Age Chart
+new Chart(document.getElementById('ageChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Child', 'Teen', 'Adult', 'Middle', 'Senior'],
+    datasets: [{
+      data: [58.0, 42.9, 38.3, 40.0, 22.7],
+      backgroundColor: ['#F59E0B','#3B82F6','#16A34A','#7C3AED','#DC2626'],
+      borderRadius: 6,
+      borderWidth: 0
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      y: { max: 80, grid: { color: '#F1F5F9' }, ticks: { callback: v => v+'%', font:{size:10} } },
+      x: { grid: { display: false }, ticks: { font:{size:10} } }
+    },
+    plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ctx.parsed.y+'% survived' } } }
+  }
+});
+
+// Family Chart
+new Chart(document.getElementById('familyChart'), {
+  type: 'line',
+  data: {
+    labels: ['1 (Alone)', '2', '3', '4', '5', '6', '7+'],
+    datasets: [{
+      label: 'Survival Rate %',
+      data: [30.4, 55.3, 57.8, 72.4, 20.0, 33.3, 12.5],
+      borderColor: '#1D4ED8',
+      backgroundColor: 'rgba(29,78,216,0.08)',
+      borderWidth: 3,
+      pointBackgroundColor: '#1D4ED8',
+      pointRadius: 5,
+      tension: 0.4,
+      fill: true
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      y: { max: 100, grid:{color:'#F1F5F9'}, ticks:{ callback: v=>v+'%', font:{size:10} } },
+      x: { grid:{display:false}, ticks:{font:{size:10}} }
+    },
+    plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx=>ctx.parsed.y+'% survival' } } }
+  }
+});
+
+// Port chart
+new Chart(document.getElementById('portChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Cherbourg (C)', 'Queenstown (Q)', 'Southampton (S)'],
+    datasets: [{
+      data: [55.4, 39.0, 33.7],
+      backgroundColor: ['#1ABC9C', '#E67E22', '#9B59B6'],
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    cutout: '60%',
+    plugins: {
+      legend: { display:true, position:'bottom', labels:{font:{size:10}, boxWidth:12, padding:8} },
+      tooltip: { callbacks:{ label: ctx => ctx.label + ': ' + ctx.parsed + '% survival' } }
+    }
+  }
+});
+
+// Nav interaction
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
