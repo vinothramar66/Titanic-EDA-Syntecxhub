@@ -27,7 +27,7 @@ This project performs an in-depth Exploratory Data Analysis (EDA) on the Titanic
 - Jupyter Notebook / Google Colab  
 - Power BI (Dashboard)  
 
-## 📂 Project Structure
+##  Project Structure
 
 Titanic-Survival-Analysis/
 │
